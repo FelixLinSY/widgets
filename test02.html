@@ -2,7 +2,7 @@
 <html>
     <head>
     <meta charset="UTF-8" />
-    </head>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <style>
 .switch {
   position: relative;
@@ -68,6 +68,7 @@ input:checked + .slider:before {
     min-width: 300px;
 }
     </style>
+</head>
     <body>
         <h2>Google AI影像辨識模型測試</h2>
 <div class="split">
@@ -201,9 +202,25 @@ function sendHook( cName ) {
     }
     if(data != "")
         data = "{ " + data + " }";
-
+    
     // var data = "client_secret=sk_test_f7PKXx5NRBFG5r41nTrPT7qB&code=%22%7BAUTHORIZATION_CODE%7D%22&grant_type=authorization_code";
-
+    // whURL += "?value1=1234";
+    $.ajax({
+        type: "POST",
+        url: whURL,
+        // jsonp: "callback",
+        data : JSON.parse(data),
+        dataType: "jsonp",
+        contentType: "application/json; charset=utf-8",
+        success: function(json){
+                console.log(json);
+        },
+        error: function(error){
+                console.log(error);
+                // alert('fail');
+        }
+    });
+    return;
     var xhr = new XMLHttpRequest();
     xhr.withCredentials = "true";
     xhr.responseType = 'json';
