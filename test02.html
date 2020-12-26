@@ -224,6 +224,7 @@ function sendHook( cName ) {
 
     xhr.open("POST", whURL);
     xhr.setRequestHeader("content-type", "application/json");
+    xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
     xhr.setRequestHeader("cache-control", "no-cache");
     xhr.send(data);
 
