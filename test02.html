@@ -205,7 +205,7 @@ function sendHook( cName ) {
     // var data = "client_secret=sk_test_f7PKXx5NRBFG5r41nTrPT7qB&code=%22%7BAUTHORIZATION_CODE%7D%22&grant_type=authorization_code";
 
     var xhr = new XMLHttpRequest();
-    xhr.withCredentials = true;
+    xhr.withCredentials = "true";
     xhr.responseType = 'json';
     xhr.addEventListener("readystatechange", function () {
         if (this.readyState === 4) {
@@ -226,6 +226,7 @@ function sendHook( cName ) {
     xhr.setRequestHeader("content-type", "application/json");
     xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
     xhr.setRequestHeader("cache-control", "no-cache");
+    console.log(xhr);
     xhr.send(data);
 
     // $.ajax({
