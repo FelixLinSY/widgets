@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta charset="UTF-8" />
+    </head>
+    <style>
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 2px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(16px);
+  -ms-transform: translateX(16px);
+  transform: translateX(16px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+.split {
+    float: left;
+    min-width: 300px;
+}
+    </style>
+    <body>
+        <h2>Google AI影像辨識模型測試</h2>
+<div class="split">
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    <h2 id="result"></h2>
+</div>
+<div class="split">
+    模型 URL：<input type="url" id="myURL" size="32" /> <br>
+    門檻值：<output>90</output>%<input id="threshold" type="range" min="0" max="100" value="90" oninput="this.previousElementSibling.value = this.value"><br>
+    <hr>
+    IFTTT - Webhook<br>
+    Key：<input type="text" id="whToken" size="32" /> <br>
+    Event：<input type="text" id="whEvent" size="32" /> <br>
+    事件連發限制：<output>1000</output> ms <input id="whLimit" step="100" type="range" min="100" max="10000" value="1000" oninput="this.previousElementSibling.value = this.value"><br>
+    value1：<input type="text" id="whV1" size="32" disabled /> <br>
+    value2：<input type="text" id="whV2" size="32" /> <br>
+    value3：<input type="text" id="whV3" size="32" /> <br>
+    發送事件：
+    <label class="switch">
+        <input type="checkbox" id="whSend" onchange="checkSetting();">
+        <span class="slider round"></span>
+    </label>
+    <button type="button" onclick="init()">啟動辨識</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    // More API functions here:
+    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
+
+    // the link to your model provided by Teachable Machine export panel
+    // const URL = "tm-my-image-model/";
+    // const URL = "https://teachablemachine.withgoogle.com/models/KewPMhUO1/";
+    var URL = "";
+
+    let model, webcam, labelContainer, maxPredictions;
+
+    // Load the image model and setup the webcam
+    async function init() {
+        counter = parseInt(document.getElementById("whLimit").value);
+        URL = document.getElementById("myURL").value;
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        // load the model and metadata
+        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+        // or files from your local hard drive
+        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        // Convenience function to setup a webcam
+        const flip = true; // whether to flip the webcam
+        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        // append elements to the DOM
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
+        }
+    }
+
+    async function loop() {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    var lastName = "";
+    var counter;
+    var swSend = false;
+    setInterval(countTime, 100);
+    function countTime() {
+        if(swSend) {
+            counter -=100;
+            if(counter <= 0 ) {
+                swSend = false;
+                counter = parseInt(document.getElementById("whLimit").value);
+            }
+        }
+    }
+    // run the webcam image through the image model
+    async function predict() {
+        // predict can take in an image, video or canvas html element
+        const prediction = await model.predict(webcam.canvas);
+        var threshold = parseInt(document.getElementById("threshold").value) / 100;
+        var timeLimit = 500;
+        
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
+            if(prediction[i].probability.toFixed(2) >= threshold) {
+                document.getElementById("result").innerHTML = prediction[i].className;
+                document.getElementById("whV1").value = prediction[i].className;
+                if(lastName != prediction[i].className) {
+                    if( !swSend && document.getElementById("whSend").checked) {
+                        swSend = true;
+                        sendHook(prediction[i].className);
+                    }
+                }
+                lastName = prediction[i].className;
+            }
+        }
+    }
+
+function sendHook( cName ) {
+    var whURL = "https://maker.ifttt.com/trigger/";
+    whURL += document.getElementById("whEvent").value;
+    whURL += "/with/key/" + document.getElementById("whToken").value;
+
+    var data = "";
+    data += '"value1" : "' + cName  + '"';
+    // if(document.getElementById("whV1").value != "") {
+    //     data += '"value1" : "' + document.getElementById("whV1").value + '"';
+    // }
+    if(document.getElementById("whV2").value != "") {
+        if( data!= "")
+            data += ",";
+        data += '"value2" : "' + document.getElementById("whV2").value + '"';
+    }
+    if(document.getElementById("whV3").value != "") {
+        if( data!= "")
+            data += ",";
+        data += '"value3" : "' + document.getElementById("whV3").value + '"';
+    }
+    if(data != "")
+        data = "{ " + data + " }";
+
+    // var data = "client_secret=sk_test_f7PKXx5NRBFG5r41nTrPT7qB&code=%22%7BAUTHORIZATION_CODE%7D%22&grant_type=authorization_code";
+
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+    xhr.responseType = 'json';
+    xhr.addEventListener("readystatechange", function () {
+        if (this.readyState === 4) {
+            console.log(this.response);
+            if( !(this.response === null)) {
+                console.log("錯誤！" + this.response.errors[0].message);
+                if(this.response.errors[0].message.indexOf("invalid key")>=0) {
+                    document.getElementById("whSend").checked = false;
+                    alert("Key 有問題！");
+                }
+            } else {
+                console.log("發送成功！");
+            }
+        }
+    });
+
+    xhr.open("POST", whURL);
+    xhr.setRequestHeader("content-type", "application/json");
+    xhr.setRequestHeader("cache-control", "no-cache");
+    xhr.send(data);
+
+    // $.ajax({
+    //     method: "POST",
+    //     url: whURL,
+    //     data: data
+    //     })
+    //     .done(function( msg ) {
+    //         alert( "發送事件: " + msg );
+    //     });
+}
+
+function checkSetting() {
+    if(document.getElementById("whSend").checked) {
+        if(document.getElementById("whToken").value == "") {
+            document.getElementById("whSend").checked = false;
+            alert("請先設定好「Key」！");
+        }
+        if(document.getElementById("whEvent").value == "") {
+            document.getElementById("whSend").checked = false;
+            alert("請先設定好「事件」！");
+        }
+    }
+}
+</script>
+
+    </body>
+</html>
